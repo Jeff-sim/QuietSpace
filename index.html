@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>静界 QuietSpace · 办公桌数字孪生与沉默协作系统</title>
+<style>
+:root{
+  --bg:#0f1220; --panel:#181c2e; --panel2:#1f2438; --line:#2a3050;
+  --text:#e8ebf5; --muted:#9aa3c0; --accent:#6c8cff; --accent2:#8b5cf6;
+  --focus:#f59e0b; --ok:#22c55e; --meeting:#ef4444; --away:#94a3b8; --rest:#38bdf8;
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
+  background:radial-gradient(1200px 600px at 20% -10%,#1b2140,transparent),var(--bg);
+  color:var(--text);min-height:100vh;padding:24px}
+.wrap{max-width:1200px;margin:0 auto}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:grid;place-items:center;font-size:22px;box-shadow:var(--shadow)}
+h1{font-size:20px;font-weight:700}
+.sub{color:var(--muted);font-size:13px;margin-top:2px}
+.grid{display:grid;grid-template-columns:1fr 340px;gap:18px}
+@media(max-width:940px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+.card h2{font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.tag{font-size:11px;color:var(--muted);font-weight:400}
+/* office grid */
+.office{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:640px){.office{grid-template-columns:repeat(2,1fr)}}
+.desk{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;
+  transition:.18s;position:relative;overflow:hidden}
+.desk:hover{transform:translateY(-3px);border-color:var(--accent)}
+.desk .avatar{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;margin-bottom:8px}
+.desk .seat-tag{position:absolute;top:10px;right:10px;font-size:10px;font-weight:700;letter-spacing:.5px;
+  color:var(--muted);background:var(--panel);border:1px solid var(--line);padding:2px 7px;border-radius:6px;font-family:ui-monospace,Menlo,monospace}
+.desk .name{font-weight:600;font-size:14px}
+.desk .role{font-size:11px;color:var(--muted);margin-bottom:10px}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 9px;border-radius:20px;font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%}
+.s-focus{background:rgba(245,158,11,.15);color:var(--focus)} .s-focus .dot{background:var(--focus)}
+.s-ok{background:rgba(34,197,94,.15);color:var(--ok)} .s-ok .dot{background:var(--ok)}
+.s-meeting{background:rgba(239,68,68,.15);color:var(--meeting)} .s-meeting .dot{background:var(--meeting)}
+.s-away{background:rgba(148,163,184,.15);color:var(--away)} .s-away .dot{background:var(--away)}
+.s-rest{background:rgba(56,189,248,.15);color:var(--rest)} .s-rest .dot{background:var(--rest)}
+.desk .hint{font-size:11px;color:var(--muted);margin-top:8px;min-height:14px}
+.ring{position:absolute;inset:0;border:2px solid transparent;border-radius:14px;pointer-events:none}
+.desk.pulse .ring{border-color:var(--focus);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{opacity:.8}50%{opacity:.2}100%{opacity:.8}}
+/* my desk */
+.me-status{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.stbtn{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:7px 11px;border-radius:20px;
+  font-size:12px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:6px}
+.stbtn:hover{border-color:var(--accent)}
+.stbtn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+/* focus mode */
+.focus-box{text-align:center;padding:8px 0}
+.timer{font-size:44px;font-weight:800;letter-spacing:1px;font-variant-numeric:tabular-nums;margin:6px 0}
+.durs{display:flex;justify-content:center;gap:8px;margin-bottom:12px}
+.durs button{flex:1;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);
+  color:var(--text);cursor:pointer;font-size:13px;transition:.15s}
+.durs button:hover{border-color:var(--focus)}
+.durs button.active{background:var(--focus);color:#161616;border-color:var(--focus);font-weight:700}
+.big-btn{width:100%;padding:12px;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;
+  background:linear-gradient(135deg,var(--focus),#fb923c);color:#161616;transition:.15s}
+.big-btn:hover{filter:brightness(1.08)}
+.big-btn.stop{background:linear-gradient(135deg,#ef4444,#f87171);color:#fff}
+.focus-note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
+/* messages */
+.msg{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:11px;margin-bottom:9px}
+.msg .top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
+.msg .who{font-weight:600}
+.msg .time{color:var(--muted)}
+.msg .body{font-size:13px;color:var(--text);line-height:1.5}
+.msg.urgent{border-color:var(--meeting);background:rgba(239,68,68,.08)}
+.badge-u{font-size:10px;background:var(--meeting);color:#fff;padding:1px 6px;border-radius:6px;margin-left:6px}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:16px 0}
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(6,8,18,.7);backdrop-filter:blur(4px);display:none;
+  place-items:center;z-index:50;padding:20px}
+.overlay.show{display:grid}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;max-width:420px;width:100%;box-shadow:var(--shadow)}
+.modal h3{font-size:17px;margin-bottom:4px}
+.modal .m-role{color:var(--muted);font-size:13px;margin-bottom:14px}
+.modal textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);
+  padding:10px;font-size:13px;resize:vertical;min-height:70px;font-family:inherit;margin:10px 0}
+.modal .acts{display:flex;gap:10px}
+.modal .acts button{flex:1;padding:11px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-weight:600}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)!important}
+.avail-note{background:var(--panel2);border-radius:10px;padding:10px;font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.6}
+.urgent-toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin:8px 0;cursor:pointer}
+/* toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;
+  background:var(--panel2);border:1px solid var(--line);padding:12px 20px;border-radius:12px;font-size:13px;
+  box-shadow:var(--shadow);transition:.3s;z-index:60;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.stat-row{display:flex;gap:10px;margin-top:6px}
+.stat{flex:1;background:var(--panel2);border-radius:10px;padding:10px;text-align:center}
+.stat .n{font-size:20px;font-weight:800}
+.stat .l{font-size:11px;color:var(--muted)}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:22px;line-height:1.7}
+/* tabs */
+.nav{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.nav button{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:9px 16px;
+  border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.nav button:hover{border-color:var(--accent);color:var(--text)}
+.nav button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.page{display:none} .page.active{display:block}
+/* calendar */
+.cal-item{display:flex;gap:10px;align-items:flex-start;background:var(--panel2);border:1px solid var(--line);
+  border-radius:12px;padding:11px;margin-bottom:9px;position:relative;transition:.15s}
+.cal-item.live{border-color:var(--meeting);background:rgba(239,68,68,.08)}
+.cal-item.done{opacity:.5}
+.cal-time{font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap;min-width:92px}
+.cal-item.live .cal-time{color:var(--meeting)}
+.cal-body{flex:1}
+.cal-title{font-size:13px;font-weight:600}
+.cal-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.cal-live-badge{font-size:10px;background:var(--meeting);color:#fff;padding:2px 7px;border-radius:6px;
+  animation:pulse 1.6s infinite}
+.clock-bar{display:flex;align-items:center;justify-content:space-between;background:var(--panel2);
+  border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--muted)}
+.clock-bar .now{font-size:15px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+.speed{display:flex;gap:6px}
+.speed button{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:4px 9px;
+  border-radius:8px;font-size:11px;cursor:pointer}
+.speed button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+/* charts */
+.privacy-note{background:rgba(108,140,255,.1);border:1px solid rgba(108,140,255,.3);border-radius:10px;
+  padding:10px 12px;font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.bar-chart{display:flex;align-items:flex-end;gap:5px;height:180px;padding-top:10px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.bar{width:100%;max-width:26px;border-radius:6px 6px 0 0;transition:.4s;position:relative;min-height:2px}
+.bar:hover::after{content:attr(data-v);position:absolute;top:-20px;left:50%;transform:translateX(-50%);
+  background:var(--bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:10px;white-space:nowrap;color:var(--text)}
+.bar-x{font-size:10px;color:var(--muted)}
+.legend{display:flex;gap:14px;font-size:11px;color:var(--muted);margin-top:12px;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+@media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.kpi .kn{font-size:26px;font-weight:800}
+.kpi .kl{font-size:12px;color:var(--muted);margin-top:4px}
+.kpi .kt{font-size:11px;margin-top:6px}
+.up{color:var(--ok)} .down{color:var(--meeting)}
+/* donut */
+.donut-wrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.donut{--p:0;width:130px;height:130px;border-radius:50%;flex-shrink:0;
+  background:conic-gradient(var(--focus) 0 calc(var(--p1)*1%),var(--ok) calc(var(--p1)*1%) calc((var(--p1)+var(--p2))*1%),var(--meeting) calc((var(--p1)+var(--p2))*1%) calc((var(--p1)+var(--p2)+var(--p3))*1%),var(--away) calc((var(--p1)+var(--p2)+var(--p3))*1%) 100%);
+  position:relative;display:grid;place-items:center}
+.donut::before{content:'';position:absolute;width:82px;height:82px;background:var(--panel);border-radius:50%}
+.donut .dc{position:relative;text-align:center}
+.donut .dc b{font-size:22px} .donut .dc small{font-size:10px;color:var(--muted)}
+.dlegend{flex:1;min-width:150px}
+.dlegend div{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px}
+.dlegend i{width:11px;height:11px;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo">🧘</div>
+      <div>
+        <h1>静界 <span style="font-weight:400;color:var(--muted);font-size:15px">QuietSpace</span></h1>
+        <div class="sub">既能被看见，又不被打扰 · 办公桌数字孪生与沉默协作系统</div>
+      </div>
+    </div>
+    <div class="stat-row" style="min-width:260px">
+      <div class="stat"><div class="n" id="statFocus">0</div><div class="l">专注中</div></div>
+      <div class="stat"><div class="n" id="statOk">0</div><div class="l">可沟通</div></div>
+      <div class="stat"><div class="n" id="statMsg">0</div><div class="l">异步留言</div></div>
+    </div>
+  </header>
+
+  <div class="nav">
+    <button class="active" data-page="office">🏢 虚拟办公空间</button>
+    <button data-page="calendar">📅 日历联动</button>
+    <button data-page="analytics">📊 团队数据分析</button>
+  </div>
+
+  <!-- ===== 页面1：虚拟办公空间 ===== -->
+  <div class="page active" id="page-office">
+  <div class="grid">
+    <!-- 左：虚拟办公空间 -->
+    <div>
+      <div class="card">
+        <h2>🏢 团队虚拟办公空间 <span class="tag">点击工位查看是否可打扰</span></h2>
+        <div class="office" id="office"></div>
+      </div>
+    </div>
+
+    <!-- 右：我的工位 + 勿扰舱 + 留言 -->
+    <div>
+      <div class="card" style="margin-bottom:18px">
+        <h2>👤 我的工位 · 状态切换</h2>
+        <div class="me-status" id="meStatus"></div>
+        <div class="focus-box">
+          <div class="durs" id="durs">
+            <button data-min="30">30 分钟</button>
+            <button data-min="60" class="active">60 分钟</button>
+            <button data-min="90">90 分钟</button>
+          </div>
+          <div class="timer" id="timer">60:00</div>
+          <button class="big-btn" id="focusBtn">进入勿扰舱 · 开启沉默协作</button>
+          <div class="focus-note" id="focusNote">进入后将屏蔽非紧急提醒，同事的问题自动转为异步留言。</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📨 异步留言箱 <span class="tag">专注期间收到的消息</span></h2>
+        <div id="msgList"><div class="empty">暂无留言，专注工作吧 ☕</div></div>
+      </div>
+    </div>
+  </div>
+  </div><!-- /page-office -->
+
+  <!-- ===== 页面2：日历联动 ===== -->
+  <div class="page" id="page-calendar">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>📅 我的日历 <span class="tag">会议自动识别 · 到点自动切换「会议中」</span></h2>
+          <div class="clock-bar">
+            <span>模拟时间 <b class="now" id="simClock">09:00</b></span>
+            <div class="speed">
+              <span style="align-self:center">推进速度</span>
+              <button data-sp="1">暂停</button>
+              <button data-sp="60" class="active">1分钟/秒</button>
+              <button data-sp="300">5分钟/秒</button>
+            </div>
+          </div>
+          <div id="calList"></div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:18px">
+          <h2>🔄 状态自动同步</h2>
+          <div class="focus-box">
+            <div style="margin-bottom:8px">当前自动状态</div>
+            <span class="status" id="autoStatus" style="font-size:14px"><span class="dot"></span>—</span>
+            <div class="focus-note" id="autoNote" style="margin-top:14px">
+              日历联动开启后，系统会在会议开始时自动把你的工位状态切为「会议中」，会议结束后恢复为「可沟通」，无需手动切换。
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>⚙️ 状态来源</h2>
+          <div class="privacy-note" style="margin:0">
+            本 Demo 演示<b>日历</b>来源。真实系统还可叠加：电脑活跃度、工位传感器、飞书 / 企微 / 钉钉 / Slack / Teams，多源融合判定最终状态。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /page-calendar -->
+
+  <!-- ===== 页面3：团队数据分析 ===== -->
+  <div class="page" id="page-analytics">
+    <div class="privacy-note">
+      🔒 <b>隐私优先</b>：以下所有数据均以<b>团队聚合</b>方式呈现，不追踪、不展示任何个人的详细行为，仅用于优化协作节奏，避免形成监控压力。（对应产品方案第四阶段）
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kn">63%</div><div class="kl">平均专注时长占比</div><div class="kt up">▲ 8% 较上周</div></div>
+      <div class="kpi"><div class="kn">142</div><div class="kl">异步留言数 / 周</div><div class="kt up">▲ 即时打扰下降 31%</div></div>
+      <div class="kpi"><div class="kn">14:00</div><div class="kl">打扰高峰时段</div><div class="kt down">▼ 建议错峰沟通</div></div>
+      <div class="kpi"><div class="kn">10-11点</div><div class="kl">最佳专注时段</div><div class="kt up">▲ 深度工作黄金期</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h2>📈 全天打扰高峰分布 <span class="tag">每小时被打扰次数</span></h2>
+        <div class="bar-chart" id="chartInterrupt"></div>
+        <div class="legend"><span><i style="background:var(--meeting)"></i>打扰次数（颜色越深越高峰）</span></div>
+      </div>
+      <div class="card">
+        <h2>🎯 专注时段分布 <span class="tag">团队平均专注人数</span></h2>
+        <div class="bar-chart" id="chartFocus"></div>
+        <div class="legend"><span><i style="background:var(--focus)"></i>专注中人数</span><span><i style="background:var(--rest)"></i>会议中人数</span></div>
+      </div>
+      <div class="card">
+        <h2>🍩 团队状态时间占比</h2>
+        <div class="donut-wrap">
+          <div class="donut" style="--p1:38;--p2:34;--p3:18"><div class="dc"><b>38%</b><small>专注</small></div></div>
+          <div class="dlegend">
+            <div><i style="background:var(--focus)"></i>专注中 · 38%</div>
+            <div><i style="background:var(--ok)"></i>可沟通 · 34%</div>
+            <div><i style="background:var(--meeting)"></i>会议中 · 18%</div>
+            <div><i style="background:var(--away)"></i>离席/休息 · 10%</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>💡 智能协作建议</h2>
+        <div class="msg"><div class="body">🔴 <b>14:00–15:00 打扰高峰</b>：建议将例会/群发通知避开该时段，改为异步。</div></div>
+        <div class="msg"><div class="body">🟢 <b>10:00–11:00 专注黄金期</b>：可默认开启团队勿扰，减少会议排入。</div></div>
+        <div class="msg"><div class="body">🟡 <b>会议过载提醒</b>：本周会议中占比 18%，2 名成员会议时长偏高，建议合并评审。</div></div>
+      </div>
+    </div>
+  </div><!-- /page-analytics -->
+
+  <footer>
+    静界 QuietSpace · 基于《办公桌数字孪生与沉默协作系统》产品方案构建 · 数字孪生工位 × 沉默协作模式<br>
+    状态来源可对接：日历 / 电脑活跃度 / 工位传感器 / 飞书·企微·钉钉·Slack·Teams
+  </footer>
+</div>
+
+<!-- 沟通弹窗 -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const STATUS = {
+  focus:  {label:'专注中', cls:'s-focus', can:false, hint:'请勿打扰 · 建议留言'},
+  ok:     {label:'可沟通', cls:'s-ok', can:true, hint:'现在可以直接沟通'},
+  meeting:{label:'会议中', cls:'s-meeting', can:false, hint:'会议中 · 建议留言'},
+  away:   {label:'离席', cls:'s-away', can:false, hint:'暂时离开工位'},
+  rest:   {label:'休息中', cls:'s-rest', can:false, hint:'休息中 · 稍后回复'}
+};
+const AVATAR_COLORS=['#6c8cff','#8b5cf6','#ec4899','#22c55e','#f59e0b','#38bdf8','#f43f5e','#14b8a6'];
+
+let team = [
+  {name:'林悦',   role:'产品经理', seat:'K1-A-001', st:'ok',      until:''},
+  {name:'陈屹',   role:'后端研发', seat:'K1-A-002', st:'focus',   until:'14:30'},
+  {name:'苏晓',   role:'UI 设计', seat:'K1-A-003',  st:'meeting',  until:'15:00'},
+  {name:'王开',   role:'前端研发', seat:'K1-B-001', st:'focus',   until:'14:15'},
+  {name:'赵敏',   role:'数据分析', seat:'K1-B-002', st:'ok',      until:''},
+  {name:'周航',   role:'测试工程', seat:'K1-B-003', st:'rest',    until:'13:45'},
+  {name:'吴桐',   role:'算法研发', seat:'K1-C-001', st:'focus',   until:'15:20'},
+  {name:'郑好',   role:'项目经理', seat:'K1-C-002', st:'away',    until:''}
+];
+
+let myStatus = 'ok';
+let selectedMin = 60;
+let focusing = false;
+let remain = 60*60;
+let timerId = null;
+let messages = [];
+
+const $ = id => document.getElementById(id);
+
+function initials(n){ return n.slice(-2); }
+function colorFor(i){ return AVATAR_COLORS[i % AVATAR_COLORS.length]; }
+
+function renderOffice(){
+  const el = $('office'); el.innerHTML='';
+  team.forEach((p,i)=>{
+    const s = STATUS[p.st];
+    const d = document.createElement('div');
+    d.className = 'desk' + (p.st==='focus'?' pulse':'');
+    d.innerHTML = `
+      <div class="ring"></div>
+      <div class="seat-tag">${p.seat}</div>
+      <div class="avatar" style="background:${colorFor(i)}">${initials(p.name)}</div>
+      <div class="name">${p.name}</div>
+      <div class="role">${p.role}</div>
+      <span class="status ${s.cls}"><span class="dot"></span>${s.label}</span>
+      <div class="hint">${s.hint}${p.until?` · 预计 ${p.until} 可沟通`:''}</div>`;
+    d.onclick = ()=>openContact(i);
+    el.appendChild(d);
+  });
+  updateStats();
+}
+
+function updateStats(){
+  $('statFocus').textContent = team.filter(p=>p.st==='focus').length;
+  $('statOk').textContent = team.filter(p=>p.st==='ok').length;
+  $('statMsg').textContent = messages.length;
+}
+
+function renderMeStatus(){
+  const el = $('meStatus'); el.innerHTML='';
+  Object.keys(STATUS).forEach(k=>{
+    if(k==='focus') return; // 专注通过勿扰舱进入
+    const b = document.createElement('button');
+    b.className='stbtn'+(myStatus===k?' active':'');
+    b.innerHTML = `<span class="dot" style="background:var(--${k==='ok'?'ok':k==='meeting'?'meeting':k==='away'?'away':'rest'})"></span>${STATUS[k].label}`;
+    b.onclick=()=>{ if(focusing) return; myStatus=k; renderMeStatus(); toast('状态已切换为「'+STATUS[k].label+'」'); };
+    el.appendChild(b);
+  });
+}
+
+// 勿扰舱 / 计时器
+function fmt(s){ const m=Math.floor(s/60), ss=s%60; return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`; }
+
+$('durs').querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{
+    if(focusing) return;
+    $('durs').querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    selectedMin = +b.dataset.min;
+    remain = selectedMin*60;
+    $('timer').textContent = fmt(remain);
+  };
+});
+
+$('focusBtn').onclick = ()=>{
+  if(!focusing){ startFocus(); } else { stopFocus(true); }
+};
+
+function startFocus(){
+  focusing = true; myStatus='focus';
+  remain = selectedMin*60;
+  const endTime = new Date(Date.now()+remain*1000);
+  const hh = String(endTime.getHours()).padStart(2,'0');
+  const mm = String(endTime.getMinutes()).padStart(2,'0');
+  $('focusBtn').textContent='结束专注 · 退出勿扰舱';
+  $('focusBtn').classList.add('stop');
+  $('focusNote').innerHTML = `🔕 已进入沉默协作模式 · 非紧急消息已屏蔽<br>对外显示：预计 <b>${hh}:${mm}</b> 可沟通`;
+  renderMeStatus();
+  toast('已进入勿扰舱，专注 '+selectedMin+' 分钟');
+  timerId = setInterval(()=>{
+    remain--; $('timer').textContent = fmt(remain);
+    if(remain<=0){ stopFocus(false); }
+  },1000);
+  // 模拟：专注期间收到异步留言
+  setTimeout(()=>{ if(focusing) simulateIncoming(false); }, 6000);
+  setTimeout(()=>{ if(focusing) simulateIncoming(true); }, 14000);
+}
+
+function stopFocus(manual){
+  focusing=false; clearInterval(timerId); timerId=null;
+  myStatus='ok';
+  remain = selectedMin*60;
+  $('timer').textContent = fmt(remain);
+  $('focusBtn').textContent='进入勿扰舱 · 开启沉默协作';
+  $('focusBtn').classList.remove('stop');
+  const pending = messages.filter(m=>!m.read).length;
+  $('focusNote').innerHTML = manual
+    ? '已退出专注模式，状态恢复为「可沟通」。'
+    : `⏰ 专注时间到！你有 <b>${pending}</b> 条待处理留言。`;
+  renderMeStatus();
+  toast(manual?'已退出勿扰舱':'专注结束，来看看留言吧');
+}
+
+// 联系人弹窗
+function openContact(i){
+  const p = team[i]; const s = STATUS[p.st];
+  const m = $('modal');
+  if(s.can){
+    m.innerHTML = `
+      <h3>${p.name} <span class="status ${s.cls}"><span class="dot"></span>${s.label}</span></h3>
+      <div class="m-role">${p.role} · 工位 ${p.seat}</div>
+      <div class="avail-note">✅ TA 当前处于可沟通状态，你可以直接发起交流。</div>
+      <textarea placeholder="输入你想说的话..." id="msgInput"></textarea>
+      <div class="acts">
+        <button class="btn-ghost" onclick="closeModal()">取消</button>
+        <button class="btn-primary" onclick="sendDirect(${i})">发送消息</button>
+      </div>`;
+  } else {
+    m.innerHTML = `
+      <h3>${p.name} <span class="status ${s.cls}"><span class="dot"></span>${s.label}</span></h3>
+      <div class="m-role">${p.role} · 工位 ${p.seat}</div>
+      <div class="avail-note">🔕 TA 正处于「${s.label}」，为保护专注时间，建议改为<b>异步留言</b>。${p.until?`<br>预计 <b>${p.until}</b> 后可沟通。`:''}</div>
+      <textarea placeholder="留言将在 TA 结束专注后送达..." id="msgInput"></textarea>
+      <label class="urgent-toggle"><input type="checkbox" id="urgentChk"> 标记为紧急事项（需说明原因，将通过特殊通道触达）</label>
+      <div class="acts">
+        <button class="btn-ghost" onclick="closeModal()">取消</button>
+        <button class="btn-primary" onclick="sendAsync(${i})">发送异步留言</button>
+      </div>`;
+  }
+  $('overlay').classList.add('show');
+}
+function closeModal(){ $('overlay').classList.remove('show'); }
+$('overlay').onclick = e=>{ if(e.target.id==='overlay') closeModal(); };
+
+function sendDirect(i){
+  const t = $('msgInput').value.trim();
+  closeModal();
+  toast(t? '消息已发送给 '+team[i].name : '已发起与 '+team[i].name+' 的沟通');
+}
+function sendAsync(i){
+  const t = $('msgInput').value.trim() || '（无内容）';
+  const urgent = $('urgentChk') && $('urgentChk').checked;
+  closeModal();
+  toast('异步留言已提交给 '+team[i].name+(urgent?'（紧急通道）':'，将在 TA 结束专注后送达'));
+}
+
+// 模拟收到留言（演示沉默协作把即时打扰转异步）
+const INCOMING = [
+  {who:'林悦', body:'方案评审的时间能定一下吗？不急，你忙完回我～'},
+  {who:'赵敏', body:'上周的数据口径想跟你对一下，异步留言给你了。'},
+  {who:'郑好', body:'【紧急】线上有个配置需要你确认，涉及今晚发布。', urgent:true}
+];
+let inIdx=0;
+function simulateIncoming(forceUrgent){
+  const pool = forceUrgent ? INCOMING.filter(x=>x.urgent) : INCOMING.filter(x=>!x.urgent);
+  const item = pool[inIdx % pool.length]; inIdx++;
+  const now = new Date();
+  messages.unshift({...item, time:`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`, read:false});
+  renderMessages();
+  toast(item.urgent? '⚠️ 收到紧急事项（特殊通道）' : '收到 1 条异步留言');
+}
+
+function renderMessages(){
+  const el = $('msgList');
+  if(!messages.length){ el.innerHTML='<div class="empty">暂无留言，专注工作吧 ☕</div>'; updateStats(); return; }
+  el.innerHTML = messages.map(m=>`
+    <div class="msg ${m.urgent?'urgent':''}">
+      <div class="top"><span class="who">${m.who}${m.urgent?'<span class="badge-u">紧急</span>':''}</span><span class="time">${m.time}</span></div>
+      <div class="body">${m.body}</div>
+    </div>`).join('');
+  updateStats();
+}
+
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2400);
+}
+
+// init
+renderOffice();
+renderMeStatus();
+$('timer').textContent = fmt(selectedMin*60);
+
+/* ============ 页签切换 ============ */
+document.querySelectorAll('.nav button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    b.classList.add('active');
+    $('page-'+b.dataset.page).classList.add('active');
+    if(b.dataset.page==='analytics') renderCharts();
+  };
+});
+
+/* ============ 日历联动模拟 ============ */
+const meetings = [
+  {start:'09:30', end:'10:00', title:'每日站会', meta:'研发团队 · 会议室 A'},
+  {start:'11:00', end:'11:45', title:'需求评审', meta:'与 林悦、苏晓 · 腾讯会议'},
+  {start:'14:00', end:'15:00', title:'季度规划对齐', meta:'跨部门 · 大会议室'},
+  {start:'16:30', end:'17:00', title:'1:1 沟通', meta:'与 郑好'}
+];
+let simMinutes = 9*60; // 09:00
+let simSpeed = 60;      // 模拟分钟/真实秒
+let simTimer = null;
+
+function toMin(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
+function fromMin(v){ v=((v%1440)+1440)%1440; return `${String(Math.floor(v/60)).padStart(2,'0')}:${String(v%60).padStart(2,'0')}`; }
+
+function currentMeeting(){ return meetings.find(m=>simMinutes>=toMin(m.start) && simMinutes<toMin(m.end)); }
+
+function renderCalendar(){
+  $('simClock').textContent = fromMin(simMinutes);
+  const live = currentMeeting();
+  $('calList').innerHTML = meetings.map(m=>{
+    const s=toMin(m.start), e=toMin(m.end);
+    const isLive = simMinutes>=s && simMinutes<e;
+    const isDone = simMinutes>=e;
+    return `<div class="cal-item ${isLive?'live':''} ${isDone?'done':''}">
+      <div class="cal-time">${m.start}–${m.end}</div>
+      <div class="cal-body">
+        <div class="cal-title">${m.title} ${isLive?'<span class="cal-live-badge">进行中</span>':''}</div>
+        <div class="cal-meta">${m.meta}</div>
+      </div></div>`;
+  }).join('');
+  // 自动同步状态
+  const as = $('autoStatus');
+  if(live){
+    as.className='status s-meeting'; as.innerHTML=`<span class="dot"></span>会议中`;
+    $('autoNote').innerHTML=`🔴 检测到日历会议「<b>${live.title}</b>」正在进行，已自动将工位状态切为<b>会议中</b>，同事看到后会改用异步留言。会议 ${live.end} 结束。`;
+    // 同步到"我的工位"页与虚拟空间（若未手动进入勿扰舱）
+    if(!focusing){ myStatus='meeting'; renderMeStatus(); }
+  } else {
+    as.className='status s-ok'; as.innerHTML=`<span class="dot"></span>可沟通`;
+    const next = meetings.find(m=>toMin(m.start)>simMinutes);
+    $('autoNote').innerHTML=`🟢 当前无会议，状态自动恢复为<b>可沟通</b>。${next?`下一场：<b>${next.title}</b> ${next.start} 开始。`:'今日会议已全部结束。'}`;
+    if(!focusing && myStatus==='meeting'){ myStatus='ok'; renderMeStatus(); }
+  }
+}
+
+function startSim(){
+  clearInterval(simTimer);
+  if(simSpeed<=1){ return; } // 暂停
+  simTimer=setInterval(()=>{
+    simMinutes += Math.round(simSpeed/10); // 每100ms推进一点，平滑
+    if(simMinutes>=18*60) simMinutes=9*60;  // 循环一天
+    renderCalendar();
+  },100);
+}
+document.querySelectorAll('.speed button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.speed button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    simSpeed=+b.dataset.sp;
+    startSim();
+  };
+});
+renderCalendar();
+startSim();
+
+/* ============ 数据分析图表 ============ */
+const HOURS = ['9','10','11','12','13','14','15','16','17','18'];
+const interruptData = [12,6,10,4,8,22,18,14,9,5];      // 打扰次数，14点高峰
+const focusData     = [5,7,6,2,3,2,3,4,5,4];           // 专注人数
+const meetingData   = [2,1,3,0,1,4,3,2,1,0];           // 会议人数
+let chartsDrawn=false;
+function renderCharts(){
+  if(chartsDrawn) return; chartsDrawn=true;
+  const maxI=Math.max(...interruptData);
+  $('chartInterrupt').innerHTML = HOURS.map((h,i)=>{
+    const v=interruptData[i], ratio=v/maxI;
+    // 越高峰颜色越深红
+    const alpha=(0.35+ratio*0.65).toFixed(2);
+    return `<div class="bar-col">
+      <div class="bar" data-v="${v}次" style="height:${ratio*100}%;background:rgba(239,68,68,${alpha})"></div>
+      <div class="bar-x">${h}</div></div>`;
+  }).join('');
+  const maxF=Math.max(...focusData,...meetingData);
+  $('chartFocus').innerHTML = HOURS.map((h,i)=>{
+    const f=focusData[i], m=meetingData[i];
+    return `<div class="bar-col" style="flex-direction:column;justify-content:flex-end;gap:2px">
+      <div class="bar" data-v="专注${f}人" style="height:${f/maxF*70}%;background:var(--focus)"></div>
+      <div class="bar" data-v="会议${m}人" style="height:${m/maxF*70}%;background:var(--rest);border-radius:0 0 6px 6px"></div>
+      <div class="bar-x">${h}</div></div>`;
+  }).join('');
+}
+
+// 团队状态轻微流动，增强"数字孪生"实时感
+setInterval(()=>{
+  const idx = Math.floor(Math.random()*team.length);
+  const keys = ['ok','focus','meeting','away','rest'];
+  const nk = keys[Math.floor(Math.random()*keys.length)];
+  team[idx].st = nk;
+  team[idx].until = (nk==='focus'||nk==='meeting'||nk==='rest')
+    ? `${14+Math.floor(Math.random()*2)}:${['00','15','30','45'][Math.floor(Math.random()*4)]}` : '';
+  renderOffice();
+}, 5000);
+</script>
+</body>
+</html>
